@@ -20,7 +20,7 @@ once `pg` is connected, then store you `.sql` files in a directory and initializ
 
 ### directory setup
 
-_/sql/accounts/get-account.sql_
+_./sql/accounts/get-account.sql_
 ```sql
 select *
 from accounts
@@ -28,14 +28,14 @@ where id = $PG{id}
 limit 1;
 ```
 
-_/sql/accounts/create-account.sql_
+_./sql/accounts/create-account.sql_
 ```sql
 insert into accounts (first_name, last_name, type, email, added)
 values (!PG{firstName}, !PG{lastName}, $PG{type}, !PG{email}, now())
 returning *;
 ```
 
-_/sql/accounts/index.js_
+_./sql/accounts/index.js_
 ```js
 const PgDir = require('@conjurelabs/pg-dir')
 
@@ -46,8 +46,9 @@ module.exports = new PgDir(__dirname)
 
 an instance of `PgDir` will expose camel-cased filenames, allowing you to query each easily
 
+__index.js__
 ```js
-const accountsSql = require('/sql/accounts')
+const accountsSql = require('./sql/accounts')
 
 async function main() {
   const accounts = await accountsSql.getAccount({
