@@ -80,7 +80,7 @@ function queryPassthrough(template) {
   return query
 }
 
-module.exports = class Sql {
+module.exports = class PgDir {
   // !!! reads dirs synchronously
   // so, this will block, while doing so
   // this is intentional, since `constructor`
