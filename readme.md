@@ -132,7 +132,7 @@ sql.beforeQuery((properties, templateValues, ...args) => {
     query: string representation of query about to be performed
     filename: name of sql file being queried against
     templateValues?: key value object caller passed to generate sql
-    args: any remaining tailing arguments caller passed
+    args?: any remaining tailing arguments caller passed
    */
 })
 
@@ -144,7 +144,7 @@ sql.afterQuery((properties, templateValues, ...args) => {
     filename: name of sql file being queried against
     result: full result object from the pg module
     templateValues?: key value object caller passed to generate sql
-    args: any remaining tailing arguments caller passed
+    args?: any remaining tailing arguments caller passed
    */
 })
 
