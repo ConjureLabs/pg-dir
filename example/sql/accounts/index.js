@@ -1,3 +1,8 @@
 const PgDir = require('@conjurelabs/pg-dir')
 
-module.exports = new PgDir(__dirname)
+const sql = new PgDir(__dirname)
+
+// logging queries
+sql.afterQuery((args) => console.log(args.query))
+
+module.exports = sql
