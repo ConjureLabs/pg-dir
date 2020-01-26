@@ -126,21 +126,25 @@ const PgDir = require('@conjurelabs/pg-dir')
 const sql = new PgDir(__dirname)
 
 // run directly before postgres query is performed
-sql.beforeQuery((properties) => {
+sql.beforeQuery((properties, templateValues, ...args) => {
   const { query, filename } = properties
   /*
     query: string representation of query about to be performed
     filename: name of sql file being queried against
+    templateValues?: key value object caller passed to generate sql
+    args: any remaining tailing arguments caller passed
    */
 })
 
 // run directly after postgres query is performed
-sql.afterQuery((properties) => {
+sql.afterQuery((properties, templateValues, ...args) => {
   const { query, filename, result } = properties
   /*
     query: string representation of query about to be performed
     filename: name of sql file being queried against
     result: full result object from the pg module
+    templateValues?: key value object caller passed to generate sql
+    args: any remaining tailing arguments caller passed
    */
 })
 
