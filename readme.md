@@ -115,3 +115,34 @@ these will only work in a postgres `where` clause
 
 see [the pg-dot-template docs' section on expression handlers](https://github.com/ConjureLabs/pg-dot-template#postgres-expression-handlers) to see more.
 
+### custom event handlers
+
+`pg-dir` supports two types of custom handlers; `beforeQuery` and `afterQuery`
+
+_./sql/accounts/index.js_
+```js
+const PgDir = require('@conjurelabs/pg-dir')
+
+const sql = new PgDir(__dirname)
+
+// run directly before postgres query is performed
+sql.beforeQuery((properties) => {
+  const { query, filename } = properties
+  /*
+    query: string representation of query about to be performed
+    filename: name of sql file being queried against
+   */
+})
+
+// run directly after postgres query is performed
+sql.afterQuery((properties) => {
+  const { query, filename, result } = properties
+  /*
+    query: string representation of query about to be performed
+    filename: name of sql file being queried against
+    result: full result object from the pg module
+   */
+})
+
+module.exports = sql
+```

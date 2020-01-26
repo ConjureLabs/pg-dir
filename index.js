@@ -2,6 +2,9 @@ const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
 
+const beforeQueryHandlers = Symbol('custom before query handlers')
+const afterQueryHandlers = Symbol('custom after query handlers')
+
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
   return name.replace(expr, match => {
@@ -25,28 +28,61 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse(template, ...args) {
+function performFullResponse({ dirPath, filename, instance }, ...args) {
   return new Promise((resolve, reject) => {
-    let query
+    const template = pgDotTemplate(path.resolve(dirPath, filename))
+
+    let queryString
     try {
-      query = template.query(...args)
+      queryString = template(...args)
     } catch(err) {
       return reject(err)
     }
 
-    query
-      .then(result => {
-        result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-        resolve(result)
+    queryString
+      .then(queryString => {
+        if (instance[beforeQueryHandlers]) {
+          for (let handler of instance[beforeQueryHandlers]) {
+            handler({
+              query: queryString,
+              filename
+            })
+          }
+        }
+
+        let query
+        try {
+          query = queryString.query()
+        } catch(err) {
+          return reject(err)
+        }
+
+        query
+          .then(result => {
+            result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+
+            if (instance[afterQueryHandlers]) {
+              for (let handler of instance[afterQueryHandlers]) {
+                handler({
+                  query: queryString,
+                  filename,
+                  result
+                })
+              }
+            }
+
+            resolve(result)
+          })
+          .catch(reject)
       })
       .catch(reject)
   })
   return template.query(...args)
 }
 
-function performQuery(template, ...args) {
+function performQuery(options, ...args) {
   return new Promise((resolve, reject) => {
-    performFullResponse(template, ...args)
+    performFullResponse(options, ...args)
       .then(response => {
         resolve(response.rows)
       })
@@ -54,9 +90,9 @@ function performQuery(template, ...args) {
   })
 }
 
-function performOne(template, ...args) {
+function performOne(options, ...args) {
   return new Promise((resolve, reject) => {
-    performQuery(template, ...args)
+    performQuery(options, ...args)
       .then(rows => {
         resolve(rows[0])
       })
@@ -64,17 +100,17 @@ function performOne(template, ...args) {
   })
 }
 
-function queryPassthrough(template) {
+function queryPassthrough(options) {
   function query(...args) {
-    return performQuery(template, ...args)
+    return performQuery(options, ...args)
   }
 
   query.one = function one(...args) {
-    return performOne(template, ...args)
+    return performOne(options, ...args)
   }
 
   query.fullResponse = function fullResponse(...args) {
-    return performFullResponse(template, ...args)
+    return performFullResponse(options, ...args)
   }
 
   return query
@@ -101,7 +137,25 @@ module.exports = class PgDir {
 
       const nameKey = snakeToCamelCase(nameParts.name, /[_-]+[a-z]/g)
 
-      this[nameKey] = queryPassthrough(pgDotTemplate(path.resolve(dirPath, dirent.name)))
+      this[nameKey] = queryPassthrough({
+        dirPath,
+        filename: dirent.name,
+        instance: this
+      })
     }
+  }
+
+  beforeQuery(handler) {
+    if (!this[beforeQueryHandlers]) {
+      this[beforeQueryHandlers] = []
+    }
+    this[beforeQueryHandlers].push(handler)
+  }
+
+  afterQuery(handler) {
+    if (!this[afterQueryHandlers]) {
+      this[afterQueryHandlers] = []
+    }
+    this[afterQueryHandlers].push(handler)
   }
 }
