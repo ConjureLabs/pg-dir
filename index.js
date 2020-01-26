@@ -2,6 +2,9 @@ const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
 
+const beforeQueryHandlers = Symbol('custom before query handlers')
+const afterQueryHandlers = Symbol('custom after query handlers')
+
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
   return name.replace(expr, match => {
@@ -25,15 +28,19 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, onBeforeQuery, onAfterQuery }, ...args) {
+function performFullResponse({ dirPath, filename, instance }, ...args) {
   return new Promise((resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
 
-    onBeforeQuery({
-      template,
-      dirPath,
-      filename
-    })
+    if (instance[beforeQueryHandlers]) {
+      for (let handler of instance[beforeQueryHandlers]) {
+        handler({
+          template,
+          dirPath,
+          filename
+        })
+      }
+    }
 
     let query
     try {
@@ -45,12 +52,17 @@ function performFullResponse({ dirPath, filename, onBeforeQuery, onAfterQuery },
     query
       .then(result => {
         result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-        onAfterQuery({
-          template,
-          dirPath,
-          filename,
-          result
-        })
+
+        if (instance[afterQueryHandlers]) {
+          for (let handler of instance[afterQueryHandlers]) {
+            handler({
+              template,
+              dirPath,
+              filename
+            })
+          }
+        }
+
         resolve(result)
       })
       .catch(reject)
@@ -118,17 +130,22 @@ module.exports = class PgDir {
       this[nameKey] = queryPassthrough({
         dirPath,
         filename: dirent.name,
-        onBeforeQuery: this.onBeforeQuery,
-        onAfterQuery: this.onAfterQuery
+        instance: this
       })
     }
   }
 
-  onBeforeQuery() {
-    // placeholder
+  beforeQuery(handler) {
+    if (!this[beforeQueryHandlers]) {
+      this[beforeQueryHandlers] = []
+    }
+    this[beforeQueryHandlers].push(handler)
   }
 
-  onAfterQuery() {
-    // placeholder
+  afterQuery(handler) {
+    if (!this[afterQueryHandlers]) {
+      this[afterQueryHandlers] = []
+    }
+    this[afterQueryHandlers].push(handler)
   }
 }
