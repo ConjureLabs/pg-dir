@@ -32,38 +32,50 @@ function performFullResponse({ dirPath, filename, instance }, ...args) {
   return new Promise((resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
 
+    let queryString
+    try {
+      queryString = template(...args)
+    } catch(err) {
+      return reject(err)
+    }
+
     if (instance[beforeQueryHandlers]) {
       for (let handler of instance[beforeQueryHandlers]) {
         handler({
-          template,
+          query: queryString,
           dirPath,
           filename
         })
       }
     }
 
-    let query
-    try {
-      query = template.query(...args)
-    } catch(err) {
-      return reject(err)
-    }
-
-    query
-      .then(result => {
-        result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-
-        if (instance[afterQueryHandlers]) {
-          for (let handler of instance[afterQueryHandlers]) {
-            handler({
-              template,
-              dirPath,
-              filename
-            })
+    queryString
+      .then(queryString => {
+        let query
+          try {
+            query = queryString.query()
+          } catch(err) {
+            return reject(err)
           }
-        }
 
-        resolve(result)
+          query
+            .then(result => {
+              result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+
+              if (instance[afterQueryHandlers]) {
+                for (let handler of instance[afterQueryHandlers]) {
+                  handler({
+                    query: queryString,
+                    dirPath,
+                    filename,
+                    result
+                  })
+                }
+              }
+
+              resolve(result)
+            })
+            .catch(reject)
       })
       .catch(reject)
   })
