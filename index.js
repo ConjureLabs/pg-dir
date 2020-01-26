@@ -39,43 +39,41 @@ function performFullResponse({ dirPath, filename, instance }, ...args) {
       return reject(err)
     }
 
-    if (instance[beforeQueryHandlers]) {
-      for (let handler of instance[beforeQueryHandlers]) {
-        handler({
-          query: queryString,
-          dirPath,
-          filename
-        })
-      }
-    }
-
     queryString
       .then(queryString => {
-        let query
-          try {
-            query = queryString.query()
-          } catch(err) {
-            return reject(err)
-          }
-
-          query
-            .then(result => {
-              result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-
-              if (instance[afterQueryHandlers]) {
-                for (let handler of instance[afterQueryHandlers]) {
-                  handler({
-                    query: queryString,
-                    dirPath,
-                    filename,
-                    result
-                  })
-                }
-              }
-
-              resolve(result)
+        if (instance[beforeQueryHandlers]) {
+          for (let handler of instance[beforeQueryHandlers]) {
+            handler({
+              query: queryString,
+              filename
             })
-            .catch(reject)
+          }
+        }
+
+        let query
+        try {
+          query = queryString.query()
+        } catch(err) {
+          return reject(err)
+        }
+
+        query
+          .then(result => {
+            result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+
+            if (instance[afterQueryHandlers]) {
+              for (let handler of instance[afterQueryHandlers]) {
+                handler({
+                  query: queryString,
+                  filename,
+                  result
+                })
+              }
+            }
+
+            resolve(result)
+          })
+          .catch(reject)
       })
       .catch(reject)
   })
