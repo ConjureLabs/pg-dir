@@ -46,7 +46,7 @@ function performFullResponse({ dirPath, filename, instance }, ...args) {
             handler({
               query: queryString,
               filename
-            })
+            }, ...args)
           }
         }
 
@@ -67,7 +67,7 @@ function performFullResponse({ dirPath, filename, instance }, ...args) {
                   query: queryString,
                   filename,
                   result
-                })
+                }, ...args)
               }
             }
 
