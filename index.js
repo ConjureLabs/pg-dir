@@ -1,6 +1,7 @@
 const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
+const { Pool } = require('pg')
 
 const beforeQueryHandlers = Symbol('custom before query handlers')
 const afterQueryHandlers = Symbol('custom after query handlers')
@@ -158,4 +159,30 @@ module.exports = class PgDir {
     }
     this[afterQueryHandlers].push(handler)
   }
+}
+
+module.exports.setup = () => {
+  const pool = new Pool()
+
+  pgDotTemplate.setup({
+    query: async (...args) => {
+      const connection = await pool.connect()
+      return new Promise(async (resolve, reject) => {
+        let result, err
+        
+        try {
+          result = await connection.query(...args)
+        } catch(tryErr) {
+          err = tryErr
+        } finally {
+          connection.release()
+        }
+
+        if (err) {
+          return reject(err)
+        }
+        resolve(result)
+      })
+    }
+  })
 }
