@@ -165,7 +165,7 @@ module.exports.setup = () => {
   const pool = new Pool()
 
   pgDotTemplate.setup({
-    query: async (...args) => {
+    query: async ({ transaction = false }, ...args) => {
       const connection = await pool.connect()
       return new Promise(async (resolve, reject) => {
         let result, err
@@ -175,7 +175,9 @@ module.exports.setup = () => {
         } catch(tryErr) {
           err = tryErr
         } finally {
-          connection.release()
+          if(!transaction) {
+            connection.release()
+          }
         }
 
         if (err) {
