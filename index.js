@@ -25,8 +25,16 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse(template, ...args) {
+function performFullResponse({ dirPath, filename, onBeforeQuery, onAfterQuery }, ...args) {
   return new Promise((resolve, reject) => {
+    const template = pgDotTemplate(path.resolve(dirPath, filename))
+
+    onBeforeQuery({
+      template,
+      dirPath,
+      filename
+    })
+
     let query
     try {
       query = template.query(...args)
@@ -37,6 +45,12 @@ function performFullResponse(template, ...args) {
     query
       .then(result => {
         result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+        onAfterQuery({
+          template,
+          dirPath,
+          filename,
+          result
+        })
         resolve(result)
       })
       .catch(reject)
@@ -44,9 +58,9 @@ function performFullResponse(template, ...args) {
   return template.query(...args)
 }
 
-function performQuery(template, ...args) {
+function performQuery(options, ...args) {
   return new Promise((resolve, reject) => {
-    performFullResponse(template, ...args)
+    performFullResponse(options, ...args)
       .then(response => {
         resolve(response.rows)
       })
@@ -54,9 +68,9 @@ function performQuery(template, ...args) {
   })
 }
 
-function performOne(template, ...args) {
+function performOne(options, ...args) {
   return new Promise((resolve, reject) => {
-    performQuery(template, ...args)
+    performQuery(options, ...args)
       .then(rows => {
         resolve(rows[0])
       })
@@ -64,17 +78,17 @@ function performOne(template, ...args) {
   })
 }
 
-function queryPassthrough(template) {
+function queryPassthrough(options) {
   function query(...args) {
-    return performQuery(template, ...args)
+    return performQuery(options, ...args)
   }
 
   query.one = function one(...args) {
-    return performOne(template, ...args)
+    return performOne(options, ...args)
   }
 
   query.fullResponse = function fullResponse(...args) {
-    return performFullResponse(template, ...args)
+    return performFullResponse(options, ...args)
   }
 
   return query
@@ -101,7 +115,20 @@ module.exports = class PgDir {
 
       const nameKey = snakeToCamelCase(nameParts.name, /[_-]+[a-z]/g)
 
-      this[nameKey] = queryPassthrough(pgDotTemplate(path.resolve(dirPath, dirent.name)))
+      this[nameKey] = queryPassthrough({
+        dirPath,
+        filename: dirent.name,
+        onBeforeQuery: this.onBeforeQuery,
+        onAfterQuery: this.onAfterQuery
+      })
     }
+  }
+
+  onBeforeQuery() {
+    // placeholder
+  }
+
+  onAfterQuery() {
+    // placeholder
   }
 }
