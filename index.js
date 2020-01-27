@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const { Pool } = require('pg')
 
+const pool = new Pool()
 const beforeQueryHandlers = Symbol('custom before query handlers')
 const afterQueryHandlers = Symbol('custom after query handlers')
 
@@ -161,33 +162,35 @@ module.exports = class PgDir {
   }
 }
 
-module.exports.setup = () => {
-  const pool = new Pool()
+// if `connection` is passed, then .onQuery assumes
+// that .release() will be handled manually
+pgDotTemplate.onQuery = (queryString, queryArgs, connection) => {
+  const connectionPassed = connection != undefined
 
-  pgDotTemplate.setup({
-    query: async ({ keepConnection = false, connection }, ...args) => {
-      if (!connection) {
+  return new Promise(async (resolve, reject) => {
+    let result, err
+
+    if (!connection) {
+      try {
         connection = await pool.connect()
+      } catch(connErr) {
+        return reject(connErr)
       }
-
-      return new Promise(async (resolve, reject) => {
-        let result, err
-        
-        try {
-          result = await connection.query(...args)
-        } catch(tryErr) {
-          err = tryErr
-        } finally {
-          if (!keepConnection) {
-            connection.release()
-          }
-        }
-
-        if (err) {
-          return reject(err)
-        }
-        resolve(result)
-      })
     }
+    
+    try {
+      result = await connection.query(queryString, queryArgs)
+    } catch(tryErr) {
+      err = tryErr
+    } finally {
+      if (!connectionPassed) {
+        connection.release()
+      }
+    }
+
+    if (err) {
+      return reject(err)
+    }
+    resolve(result)
   })
 }
