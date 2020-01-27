@@ -29,7 +29,8 @@
   },
   "dependencies": {
     "@conjurelabs/dot-template": ">= 2.0.0",
-    "@conjurelabs/pg-dot-template": ">= 2.0.0-rc4"
+    "@conjurelabs/pg-dot-template": ">= 2.0.0-rc4",
+    "debug": "4.1.1"
   },
   "peerDependencies": {
     "pg": ">= 7.0.0"

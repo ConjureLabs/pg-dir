@@ -2,6 +2,7 @@ const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
 const { Pool } = require('pg')
+const debug = require('debug')('pg-dir')
 
 const pool = new Pool()
 const transactionSession = Symbol('tracking transaction session within instance')
@@ -202,6 +203,8 @@ module.exports = class PgDir {
 function handleQuery(queryString, queryArgs, session) {
   session = session || {}
   let { connection, keepAlive = false } = session
+
+  debug(queyrString)
 
   return new Promise(async (resolve, reject) => {
     let result, err
