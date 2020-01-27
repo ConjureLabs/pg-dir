@@ -142,9 +142,20 @@ async function wrapInTransaction(pgDirInstance) {
       }
 
       if (prop === 'commit') {
-        return () => {
-          onQuery()
-        }
+        return new Promise((resolve, reject) => {
+          onQuery('commit', null, session)
+            .then(result => {
+              session.connection.release()
+              session.keepAlive = false
+              resolve(result)
+            })
+            .catch(reject)
+        })
+      }
+
+      if (prop === 'rollback') {
+        session.keepAlive = false
+        return onQuery('rollback', null, session)
       }
 
       return Reflect.get(target, prop)
