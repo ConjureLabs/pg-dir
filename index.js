@@ -198,6 +198,10 @@ module.exports = class PgDir {
     }
     this[afterQueryHandlers].push(handler)
   }
+
+  transaction() {
+    return wrapInTransaction(this)
+  }
 }
 
 // if `connection` is passed, then .onQuery assumes
