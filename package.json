@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@conjurelabs/dot-template": ">= 2.0.0",
-    "@conjurelabs/pg-dot-template": ">= 2.0.0-rc3"
+    "@conjurelabs/pg-dot-template": ">= 2.0.0-rc4"
   },
   "peerDependencies": {
     "pg": ">= 7.0.0"
