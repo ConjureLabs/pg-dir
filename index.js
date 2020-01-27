@@ -123,7 +123,15 @@ function queryPassthrough(options) {
 
 async function wrapInTransaction(pgDirInstance) {
   const session = { connection: null, keepAlive: true }
-  const connection = await onQuery('begin', null, session)
+
+  try {
+    session.connection = await onQuery('begin', null, session)
+  } catch (err) {
+    try {
+      session.connection.release()
+    } catch(_) {}
+    throw err
+  }
 
   return new Proxy(pgDirInstance, {
     get: (target, prop) => {
