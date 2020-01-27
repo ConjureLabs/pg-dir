@@ -150,3 +150,36 @@ sql.afterQuery((properties, templateValues, ...args) => {
 
 module.exports = sql
 ```
+
+### transactions
+
+`pg-dir` adds utility methods for dealing with `begin`, `commit` and `rollback` (transaction blocks)
+
+```js
+// triggers `begin` query
+const transaction = await accountsSql.transaction()
+
+try {
+  const newAccountRow = await transaction.createAccount.one({
+    firstName: 'timoteo',
+    lastName: 'marshall',
+    type: 'user',
+    email: 'timoteo@marshall.museum'
+  })
+
+  await transaction.createAccountLogin({
+    accountId: newAccountRow.id
+  })
+
+  // triggers `commit` query
+  // then attempts connection.release()
+  await transaction.commit()
+} catch(err) {
+  // triggers `rollback` query
+  // then connection.release()
+  await transaction.rollback()
+
+  console.error(err)
+}
+
+```
