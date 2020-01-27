@@ -115,42 +115,6 @@ these will only work in a postgres `where` clause
 
 see [the pg-dot-template docs' section on expression handlers](https://github.com/ConjureLabs/pg-dot-template#postgres-expression-handlers) to see more.
 
-### custom event handlers
-
-`pg-dir` supports two types of custom handlers; `beforeQuery` and `afterQuery`
-
-_./sql/accounts/index.js_
-```js
-const PgDir = require('@conjurelabs/pg-dir')
-
-const sql = new PgDir(__dirname)
-
-// run directly before postgres query is performed
-sql.beforeQuery((properties, templateValues, ...args) => {
-  const { query, filename } = properties
-  /*
-    query: string representation of query about to be performed
-    filename: name of sql file being queried against
-    templateValues?: key value object caller passed to generate sql
-    args?: any remaining tailing arguments caller passed
-   */
-})
-
-// run directly after postgres query is performed
-sql.afterQuery((properties, templateValues, ...args) => {
-  const { query, filename, result } = properties
-  /*
-    query: string representation of query about to be performed
-    filename: name of sql file being queried against
-    result: full result object from the pg module
-    templateValues?: key value object caller passed to generate sql
-    args?: any remaining tailing arguments caller passed
-   */
-})
-
-module.exports = sql
-```
-
 ### transactions
 
 `pg-dir` adds utility methods for dealing with `begin`, `commit` and `rollback` (transaction blocks)
@@ -182,3 +146,13 @@ try {
   console.error(err)
 }
 ```
+
+### console logging
+
+logging is built in - this library uses the [debug](https://www.npmjs.com/package/debug) module
+
+```sh
+DEBUG="pg-dir:*" node ./
+```
+
+this will log all queries _before_ they are executed

@@ -2,12 +2,11 @@ const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
 const { Pool } = require('pg')
+const debug = require('debug')('pg-dir')
 
 const pool = new Pool()
 const transactionSession = Symbol('tracking transaction session within instance')
 const withinTransaction = Symbol('queries are within a transaction block')
-const beforeQueryHandlers = Symbol('custom before query handlers')
-const afterQueryHandlers = Symbol('custom after query handlers')
 
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
@@ -32,53 +31,24 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, instance, getSession }, ...args) {
+function performFullResponse({ dirPath, filename, getSession }, ...args) {
   return new Promise((resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
+    const session = getSession()
 
-    let queryString
+    let query
+    const queryArgs = [...args]
+    queryArgs.push(session)
     try {
-      queryString = template(...args)
+      query = template.query(...queryArgs)
     } catch(err) {
       return reject(err)
     }
 
-    queryString
-      .then(queryString => {
-        if (instance[beforeQueryHandlers]) {
-          for (let handler of instance[beforeQueryHandlers]) {
-            handler({
-              query: queryString,
-              filename
-            }, ...args)
-          }
-        }
-
-        const session = getSession()
-        let query
-        try {
-          query = queryString.query(session)
-        } catch(err) {
-          return reject(err)
-        }
-
-        query
-          .then(result => {
-            result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-
-            if (instance[afterQueryHandlers]) {
-              for (let handler of instance[afterQueryHandlers]) {
-                handler({
-                  query: queryString,
-                  filename,
-                  result
-                }, ...args)
-              }
-            }
-
-            resolve(result)
-          })
-          .catch(reject)
+    query
+      .then(result => {
+        result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+        resolve(result)
       })
       .catch(reject)
   })
@@ -121,17 +91,9 @@ function queryPassthrough(options) {
   return query
 }
 
-async function wrapInTransaction(pgDirInstance) {
-  const session = { connection: null, keepAlive: true }
-
-  try {
-    session.connection = await onQuery('begin', null, session)
-  } catch (err) {
-    try {
-      session.connection.release()
-    } catch(_) {}
-    throw err
-  }
+function proxiedTransactionInstance(pgDirInstance) {
+  // values set during lifecycle
+  const session = { connection: null, keepAlive: false }
 
   return new Proxy(pgDirInstance, {
     get: (target, prop) => {
@@ -149,9 +111,18 @@ async function wrapInTransaction(pgDirInstance) {
         return session
       }
 
+      if (prop === 'begin') {
+        return () => new Promise((resolve, reject) => {
+          session.keepAlive = true
+          handleQuery('begin', null, session)
+            .then(resolve)
+            .catch(reject)
+        })
+      }
+
       if (prop === 'commit') {
-        return new Promise((resolve, reject) => {
-          onQuery('commit', null, session)
+        return () => new Promise((resolve, reject) => {
+          handleQuery('commit', null, session)
             .then(result => {
               session.connection.release()
               session.keepAlive = false
@@ -163,7 +134,7 @@ async function wrapInTransaction(pgDirInstance) {
 
       if (prop === 'rollback') {
         session.keepAlive = false
-        return onQuery('rollback', null, session)
+        return () => handleQuery('rollback', null, session)
       }
 
       return Reflect.get(target, prop)
@@ -222,29 +193,18 @@ module.exports = class PgDir {
     }
   }
 
-  beforeQuery(handler) {
-    if (!this[beforeQueryHandlers]) {
-      this[beforeQueryHandlers] = []
-    }
-    this[beforeQueryHandlers].push(handler)
-  }
-
-  afterQuery(handler) {
-    if (!this[afterQueryHandlers]) {
-      this[afterQueryHandlers] = []
-    }
-    this[afterQueryHandlers].push(handler)
-  }
-
-  transaction() {
-    return wrapInTransaction(this)
+  get transaction() {
+    return proxiedTransactionInstance(this)
   }
 }
 
-// if `connection` is passed, then .onQuery assumes
+// if `connection` is passed, then .handleQuery assumes
 // that .release() will be handled manually
-function onQuery(queryString, queryArgs, session = {}) {
-  const { connection, keepAlive = false } = session
+function handleQuery(queryString, queryArgs, session) {
+  session = session || {}
+  let { connection, keepAlive = false } = session
+
+  debug(queyrString)
 
   return new Promise(async (resolve, reject) => {
     let result, err
@@ -276,4 +236,4 @@ function onQuery(queryString, queryArgs, session = {}) {
   })
 }
 
-pgDotTemplate.onQuery = onQuery
+pgDotTemplate.handleQuery = handleQuery
