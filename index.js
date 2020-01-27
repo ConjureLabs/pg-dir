@@ -125,7 +125,7 @@ async function wrapInTransaction(pgDirInstance) {
   const session = { connection: null, keepAlive: true }
 
   try {
-    session.connection = await onQuery('begin', null, session)
+    session.connection = await handleQuery('begin', null, session)
   } catch (err) {
     try {
       session.connection.release()
@@ -151,7 +151,7 @@ async function wrapInTransaction(pgDirInstance) {
 
       if (prop === 'commit') {
         return new Promise((resolve, reject) => {
-          onQuery('commit', null, session)
+          handleQuery('commit', null, session)
             .then(result => {
               session.connection.release()
               session.keepAlive = false
@@ -163,7 +163,7 @@ async function wrapInTransaction(pgDirInstance) {
 
       if (prop === 'rollback') {
         session.keepAlive = false
-        return onQuery('rollback', null, session)
+        return handleQuery('rollback', null, session)
       }
 
       return Reflect.get(target, prop)
@@ -241,9 +241,9 @@ module.exports = class PgDir {
   }
 }
 
-// if `connection` is passed, then .onQuery assumes
+// if `connection` is passed, then .handleQuery assumes
 // that .release() will be handled manually
-function onQuery(queryString, queryArgs, session = {}) {
+function handleQuery(queryString, queryArgs, session = {}) {
   const { connection, keepAlive = false } = session
 
   return new Promise(async (resolve, reject) => {
@@ -276,4 +276,4 @@ function onQuery(queryString, queryArgs, session = {}) {
   })
 }
 
-pgDotTemplate.onQuery = onQuery
+pgDotTemplate.handleQuery = handleQuery
