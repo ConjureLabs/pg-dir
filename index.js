@@ -244,7 +244,8 @@ module.exports = class PgDir {
 // if `connection` is passed, then .handleQuery assumes
 // that .release() will be handled manually
 function handleQuery(queryString, queryArgs, session) {
-  let { connection, keepAlive = false } = (session || {})
+  session = session || {}
+  let { connection, keepAlive = false } = session
 
   return new Promise(async (resolve, reject) => {
     let result, err
