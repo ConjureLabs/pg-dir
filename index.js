@@ -1,7 +1,11 @@
 const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
+const { Pool } = require('pg')
 
+const pool = new Pool()
+const transactionSession = Symbol('tracking transaction session within instance')
+const withinTransaction = Symbol('queries are within a transaction block')
 const beforeQueryHandlers = Symbol('custom before query handlers')
 const afterQueryHandlers = Symbol('custom after query handlers')
 
@@ -28,7 +32,7 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, instance }, ...args) {
+function performFullResponse({ dirPath, filename, instance, getSession }, ...args) {
   return new Promise((resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
 
@@ -50,9 +54,10 @@ function performFullResponse({ dirPath, filename, instance }, ...args) {
           }
         }
 
+        const session = getSession()
         let query
         try {
-          query = queryString.query()
+          query = queryString.query(session)
         } catch(err) {
           return reject(err)
         }
@@ -116,6 +121,74 @@ function queryPassthrough(options) {
   return query
 }
 
+async function wrapInTransaction(pgDirInstance) {
+  const session = { connection: null, keepAlive: true }
+
+  try {
+    session.connection = await onQuery('begin', null, session)
+  } catch (err) {
+    try {
+      session.connection.release()
+    } catch(_) {}
+    throw err
+  }
+
+  return new Proxy(pgDirInstance, {
+    get: (target, prop) => {
+      // disallow nested transactions
+      if (prop === 'transaction') {
+        return undefined
+      }
+
+      // marking instance as within a transaction
+      if (prop === withinTransaction) {
+        return true
+      }
+
+      if (prop === transactionSession) {
+        return session
+      }
+
+      if (prop === 'commit') {
+        return new Promise((resolve, reject) => {
+          onQuery('commit', null, session)
+            .then(result => {
+              session.connection.release()
+              session.keepAlive = false
+              resolve(result)
+            })
+            .catch(reject)
+        })
+      }
+
+      if (prop === 'rollback') {
+        session.keepAlive = false
+        return onQuery('rollback', null, session)
+      }
+
+      return Reflect.get(target, prop)
+    },
+
+    ownKeys: target => {
+      const ownKeys = Reflect.ownKeys(target)
+      ownKeys.splice(ownKeys.indexOf('transaction'), 1)
+      ownKeys.push('commit')
+      ownKeys.push('rollback')
+      return ownKeys
+    },
+
+    has: (target, prop) => {
+      if (prop === 'transaction') {
+        return false
+      }
+      if (prop === 'commit' || prop === 'rollback') {
+        return true
+      }
+      return prop in target
+    }
+  })
+}
+
 module.exports = class PgDir {
   // !!! reads dirs synchronously
   // so, this will block, while doing so
@@ -140,8 +213,12 @@ module.exports = class PgDir {
       this[nameKey] = queryPassthrough({
         dirPath,
         filename: dirent.name,
-        instance: this
+        instance: this,
+        getSession: () => this[transactionSession]
       })
+
+      this[withinTransaction] = false
+      this[transactionSession] = null
     }
   }
 
@@ -158,4 +235,45 @@ module.exports = class PgDir {
     }
     this[afterQueryHandlers].push(handler)
   }
+
+  transaction() {
+    return wrapInTransaction(this)
+  }
 }
+
+// if `connection` is passed, then .onQuery assumes
+// that .release() will be handled manually
+function onQuery(queryString, queryArgs, session = {}) {
+  const { connection, keepAlive = false } = session
+
+  return new Promise(async (resolve, reject) => {
+    let result, err
+
+    if (!connection) {
+      try {
+        connection = await pool.connect()
+      } catch(connErr) {
+        return reject(connErr)
+      }
+    }
+
+    session.connection = connection
+    
+    try {
+      result = await connection.query(queryString, queryArgs)
+    } catch(tryErr) {
+      err = tryErr
+    } finally {
+      if (!keepAlive) {
+        connection.release()
+      }
+    }
+
+    if (err) {
+      return reject(err)
+    }
+    resolve(result)
+  })
+}
+
+pgDotTemplate.onQuery = onQuery
