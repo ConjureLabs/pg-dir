@@ -6,8 +6,6 @@ const { Pool } = require('pg')
 const pool = new Pool()
 const transactionSession = Symbol('tracking transaction session within instance')
 const withinTransaction = Symbol('queries are within a transaction block')
-const beforeQueryHandlers = Symbol('custom before query handlers')
-const afterQueryHandlers = Symbol('custom after query handlers')
 
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
@@ -32,53 +30,24 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, instance, getSession }, ...args) {
+function performFullResponse({ dirPath, filename, getSession }, ...args) {
   return new Promise((resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
+    const session = getSession()
 
-    let queryString
+    let query
+    const queryArgs = [...args]
+    queryArgs.push(session)
     try {
-      queryString = template(...args)
+      query = template.query(...queryArgs)
     } catch(err) {
       return reject(err)
     }
 
-    queryString
-      .then(queryString => {
-        if (instance[beforeQueryHandlers]) {
-          for (let handler of instance[beforeQueryHandlers]) {
-            handler({
-              query: queryString,
-              filename
-            }, ...args)
-          }
-        }
-
-        const session = getSession()
-        let query
-        try {
-          query = queryString.query(session)
-        } catch(err) {
-          return reject(err)
-        }
-
-        query
-          .then(result => {
-            result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-
-            if (instance[afterQueryHandlers]) {
-              for (let handler of instance[afterQueryHandlers]) {
-                handler({
-                  query: queryString,
-                  filename,
-                  result
-                }, ...args)
-              }
-            }
-
-            resolve(result)
-          })
-          .catch(reject)
+    query
+      .then(result => {
+        result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+        resolve(result)
       })
       .catch(reject)
   })
@@ -221,20 +190,6 @@ module.exports = class PgDir {
       this[withinTransaction] = false
       this[transactionSession] = null
     }
-  }
-
-  beforeQuery(handler) {
-    if (!this[beforeQueryHandlers]) {
-      this[beforeQueryHandlers] = []
-    }
-    this[beforeQueryHandlers].push(handler)
-  }
-
-  afterQuery(handler) {
-    if (!this[afterQueryHandlers]) {
-      this[afterQueryHandlers] = []
-    }
-    this[afterQueryHandlers].push(handler)
   }
 
   get transaction() {
