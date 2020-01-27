@@ -159,6 +159,24 @@ async function wrapInTransaction(pgDirInstance) {
       }
 
       return Reflect.get(target, prop)
+    },
+
+    ownKeys: target => {
+      const ownKeys = Reflect.ownKeys(target)
+      ownKeys.splice(ownKeys.indexOf('transaction'), 1)
+      ownKeys.push('commit')
+      ownKeys.push('rollback')
+      return ownKeys
+    },
+
+    has: (target, prop) => {
+      if (prop === 'transaction') {
+        return false
+      }
+      if (prop === 'commit' || prop === 'rollback') {
+        return true
+      }
+      return prop in target
     }
   })
 }
