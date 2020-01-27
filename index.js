@@ -204,7 +204,7 @@ function handleQuery(queryString, queryArgs, session) {
   session = session || {}
   let { connection, keepAlive = false } = session
 
-  debug(queyrString)
+  debug(queryString)
 
   return new Promise(async (resolve, reject) => {
     let result, err
