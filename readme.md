@@ -120,10 +120,12 @@ see [the pg-dot-template docs' section on expression handlers](https://github.co
 `pg-dir` adds utility methods for dealing with `begin`, `commit` and `rollback` (transaction blocks)
 
 ```js
-// triggers `begin` query
-const transaction = await accountsSql.transaction()
+const transaction = await accountsSql.transaction
 
 try {
+  // triggers `begin` query
+  await transaction.begin()
+
   const newAccountRow = await transaction.createAccount.one({
     firstName: 'timoteo',
     lastName: 'marshall',
