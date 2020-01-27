@@ -121,17 +121,9 @@ function queryPassthrough(options) {
   return query
 }
 
-async function wrapInTransaction(pgDirInstance) {
-  const session = { connection: null, keepAlive: true }
-
-  try {
-    session.connection = await handleQuery('begin', null, session)
-  } catch (err) {
-    try {
-      session.connection.release()
-    } catch(_) {}
-    throw err
-  }
+function proxiedTransactionInstance(pgDirInstance) {
+  // values set during lifecycle
+  const session = { connection: null, keepAlive: false }
 
   return new Proxy(pgDirInstance, {
     get: (target, prop) => {
@@ -149,8 +141,17 @@ async function wrapInTransaction(pgDirInstance) {
         return session
       }
 
+      if (prop === 'begin') {
+        return () => new Promise((resolve, reject) => {
+          session.keepAlive = true
+          handleQuery('begin', null, session)
+            .then(resolve)
+            .catch(reject)
+        })
+      }
+
       if (prop === 'commit') {
-        return new Promise((resolve, reject) => {
+        return () => new Promise((resolve, reject) => {
           handleQuery('commit', null, session)
             .then(result => {
               session.connection.release()
@@ -163,7 +164,7 @@ async function wrapInTransaction(pgDirInstance) {
 
       if (prop === 'rollback') {
         session.keepAlive = false
-        return handleQuery('rollback', null, session)
+        return () => handleQuery('rollback', null, session)
       }
 
       return Reflect.get(target, prop)
@@ -236,8 +237,8 @@ module.exports = class PgDir {
     this[afterQueryHandlers].push(handler)
   }
 
-  transaction() {
-    return wrapInTransaction(this)
+  get transaction() {
+    return proxiedTransactionInstance(this)
   }
 }
 
