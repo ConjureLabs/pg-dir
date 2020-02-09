@@ -32,25 +32,30 @@ function objWithCamelCaseKeys(obj) {
 }
 
 function performFullResponse({ dirPath, filename, getSession }, ...args) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
     const session = getSession()
 
-    let query
+    let queryString, result
     const queryArgs = [...args]
     queryArgs.push(session)
+
     try {
-      query = template.query(...queryArgs)
+      queryString = await template(...queryArgs)
     } catch(err) {
       return reject(err)
     }
 
-    query
-      .then(result => {
-        result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
-        resolve(result)
-      })
-      .catch(reject)
+    debug(queryString)
+
+    try {
+      result = await queryString.query()
+    } catch(err) {
+      return reject(err)
+    }
+
+    result.rows = result.rows.map(row => objWithCamelCaseKeys(row))
+    resolve(result)
   })
   return template.query(...args)
 }
@@ -203,8 +208,6 @@ module.exports = class PgDir {
 function handleQuery(queryString, queryArgs, session) {
   session = session || {}
   let { connection, keepAlive = false } = session
-
-  debug(queryString)
 
   return new Promise(async (resolve, reject) => {
     let result, err
