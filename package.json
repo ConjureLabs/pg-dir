@@ -1,6 +1,6 @@
 {
   "name": "@conjurelabs/pg-dir",
-  "version": "2.0.3-rc2",
+  "version": "2.0.3",
   "description": "query postgres using directories of templatized sql flat files",
   "main": "index.js",
   "scripts": {
