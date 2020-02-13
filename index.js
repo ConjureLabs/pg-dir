@@ -47,7 +47,7 @@ function performFullResponse({ dirPath, filename, getSession }, ...args) {
       return reject(err)
     }
 
-    debug(chalk.magenta(queryString))
+    debug(chalk.blue(queryString.sanitized))
 
     try {
       result = await queryString.query()
