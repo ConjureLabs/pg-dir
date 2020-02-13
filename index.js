@@ -2,6 +2,7 @@ const pgDotTemplate = require('@conjurelabs/pg-dot-template')
 const path = require('path')
 const fs = require('fs')
 const { Pool } = require('pg')
+const chalk = require('chalk')
 const debug = require('debug')('pg-dir')
 
 const pool = new Pool()
@@ -46,7 +47,7 @@ function performFullResponse({ dirPath, filename, getSession }, ...args) {
       return reject(err)
     }
 
-    debug(queryString)
+    debug(chalk.magenta(queryString))
 
     try {
       result = await queryString.query()

@@ -30,6 +30,7 @@
   "dependencies": {
     "@conjurelabs/dot-template": ">= 2.0.0",
     "@conjurelabs/pg-dot-template": "2.0.1",
+    "chalk": "3.0.0",
     "debug": "4.1.1"
   },
   "peerDependencies": {
