@@ -2,6 +2,8 @@
 
 this module exports a class that uses [pg-dot-template](https://github.com/ConjureLabs/pg-dot-template/) to fill in templatized sql files, and provides some nicities to query and use data.
 
+**!!!** keep in mind that postgres only supports `$PG{var}` and `!PG{var}` replacements in `where` clauses, not in `select`, `set`, etc
+
 ## install
 
 ```sh
