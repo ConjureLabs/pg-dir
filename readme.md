@@ -154,7 +154,15 @@ try {
 logging is built in - this library uses the [debug](https://www.npmjs.com/package/debug) module
 
 ```sh
-DEBUG="pg-dir:*" node ./
+DEBUG="pg-dir:query" node ./
 ```
 
-this will log all queries _before_ they are executed
+this will log all queries _before_ they are executed, and these logs will be sanitized on non-development environments
+
+```sh
+DEBUG="pg-dir:executed" node ./
+```
+
+this will log queries as they are executed, with **no sanitization**
+
+the exact query being passed to `pg`, along with an array of arguments for placeholder values, will be logged
