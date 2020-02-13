@@ -3,7 +3,8 @@ const path = require('path')
 const fs = require('fs')
 const { Pool } = require('pg')
 const chalk = require('chalk')
-const debug = require('debug')('pg-dir')
+const debugQuery = require('debug')('pg-dir:query')
+const debugExecuted = require('debug')('pg-dir:executed')
 
 const pool = new Pool()
 const transactionSession = Symbol('tracking transaction session within instance')
@@ -47,7 +48,7 @@ function performFullResponse({ dirPath, filename, getSession }, ...args) {
       return reject(err)
     }
 
-    debug(chalk.blue(queryString.sanitized))
+    debugQuery(chalk.blue(queryString.sanitized))
 
     try {
       result = await queryString.query()
@@ -222,6 +223,8 @@ function handleQuery(queryString, queryArgs, session) {
     }
 
     session.connection = connection
+
+    debugExecuted(queryString, queryArgs)
     
     try {
       result = await connection.query(queryString, queryArgs)
