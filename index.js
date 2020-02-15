@@ -82,7 +82,7 @@ function performOne(options, ...args) {
   })
 }
 
-function queryPassthrough(options) {
+function queryPassthrough(options = {}) {
   function query(...args) {
     return performQuery(options, ...args)
   }
