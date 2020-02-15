@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@conjurelabs/dot-template": "2.2.0",
-    "@conjurelabs/pg-dot-template": "2.0.1",
+    "@conjurelabs/pg-dot-template": "2.0.2",
     "chalk": "3.0.0",
     "debug": "4.1.1"
   },
