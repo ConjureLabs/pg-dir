@@ -33,13 +33,13 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, getSession }, ...args) {
+function performFullResponse({ dirPath, filename, getSession }, placeholders = {}, ...args) {
   return new Promise(async (resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
     const session = getSession()
 
     let queryString, result
-    const queryArgs = [...args]
+    const queryArgs = [placeholders, ...args]
     queryArgs.push(session)
 
     try {
@@ -82,7 +82,7 @@ function performOne(options, ...args) {
   })
 }
 
-function queryPassthrough(options = {}) {
+function queryPassthrough(options) {
   function query(...args) {
     return performQuery(options, ...args)
   }
