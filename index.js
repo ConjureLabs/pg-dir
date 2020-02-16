@@ -82,6 +82,20 @@ function performOne(options, ...args) {
   })
 }
 
+function performQueryToHash(options, key, ...args) {
+  return new Promise((resolve, reject) => {
+    performFullResponse(options, ...args)
+      .then(response => {
+        const hash = response.rows.reduce((hash, row) => {
+          hash[ row[key] ] = row
+          return hash
+        }, {})
+        resolve(hash)
+      })
+      .catch(reject)
+  })
+}
+
 function queryPassthrough(options) {
   function query(...args) {
     return performQuery(options, ...args)
@@ -93,6 +107,12 @@ function queryPassthrough(options) {
 
   query.fullResponse = function fullResponse(...args) {
     return performFullResponse(options, ...args)
+  }
+
+  query.hash = function(key) {
+    return function(...args) {
+      return performQueryToHash(options, key, ...args)
+    }
   }
 
   return query
