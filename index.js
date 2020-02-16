@@ -140,6 +140,7 @@ function proxiedTransactionInstance(pgDirInstance) {
 
       if (prop === 'begin') {
         return () => new Promise((resolve, reject) => {
+          debugQuery(chalk.blue('begin'))
           session.keepAlive = true
           handleQuery('begin', null, session)
             .then(resolve)
@@ -149,6 +150,7 @@ function proxiedTransactionInstance(pgDirInstance) {
 
       if (prop === 'commit') {
         return () => new Promise((resolve, reject) => {
+          debugQuery(chalk.blue('commit'))
           handleQuery('commit', null, session)
             .then(result => {
               session.connection.release()
@@ -161,7 +163,10 @@ function proxiedTransactionInstance(pgDirInstance) {
 
       if (prop === 'rollback') {
         session.keepAlive = false
-        return () => handleQuery('rollback', null, session)
+        return () => {
+          debugQuery(chalk.blue('rollback'))
+          return handleQuery('rollback', null, session)
+        }
       }
 
       return Reflect.get(target, prop)
