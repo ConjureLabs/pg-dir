@@ -96,6 +96,17 @@ const account = await accountsSql.getAccount.one({
 })
 ```
 
+### .hash(key)
+
+a common pattern is to pull rows and have them stored in a lookup hash, by specific key
+
+```js
+const accounts = await accountsSql.getAllAccounts.hash('email')({
+  limit: 10
+})
+// returns { [email]: <row> }
+```
+
 ### .fullResponse()
 
 if you need to access the full postgres response object, you can use `.fullResponse`
