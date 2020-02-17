@@ -7,8 +7,8 @@ const debugQuery = require('debug')('pg-dir:query')
 const debugExecuted = require('debug')('pg-dir:executed')
 
 const pool = new Pool()
-const transactionSession = Symbol('tracking transaction session within instance')
-const withinTransaction = Symbol('queries are within a transaction block')
+const privateDirPath = Symbol('privateDirPath')
+const privateSession = Symbol('privateSession')
 
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
@@ -33,10 +33,9 @@ function objWithCamelCaseKeys(obj) {
   return obj
 }
 
-function performFullResponse({ dirPath, filename, getSession }, placeholders = {}, ...args) {
+function performFullResponse({ dirPath, filename, session }, placeholders = {}, ...args) {
   return new Promise(async (resolve, reject) => {
     const template = pgDotTemplate(path.resolve(dirPath, filename))
-    const session = getSession()
 
     let queryString, result
     const queryArgs = [placeholders, ...args]
@@ -118,87 +117,44 @@ function queryPassthrough(options) {
   return query
 }
 
-function proxiedTransactionInstance(pgDirInstance) {
-  // values set during lifecycle
-  const session = { connection: null, keepAlive: false }
-
-  return new Proxy(pgDirInstance, {
-    get: (target, prop) => {
-      // disallow nested transactions
-      if (prop === 'transaction') {
-        return undefined
-      }
-
-      // marking instance as within a transaction
-      if (prop === withinTransaction) {
-        return true
-      }
-
-      if (prop === transactionSession) {
-        return session
-      }
-
-      if (prop === 'begin') {
-        return () => new Promise((resolve, reject) => {
-          debugQuery(chalk.blue('begin'))
-          session.keepAlive = true
-          handleQuery('begin', null, session)
-            .then(resolve)
-            .catch(reject)
-        })
-      }
-
-      if (prop === 'commit') {
-        return () => new Promise((resolve, reject) => {
-          debugQuery(chalk.blue('commit'))
-          handleQuery('commit', null, session)
-            .then(result => {
-              session.connection.release()
-              session.keepAlive = false
-              resolve(result)
-            })
-            .catch(reject)
-        })
-      }
-
-      if (prop === 'rollback') {
-        session.keepAlive = false
-        return () => {
-          debugQuery(chalk.blue('rollback'))
-          return handleQuery('rollback', null, session)
-        }
-      }
-
-      return Reflect.get(target, prop)
-    },
-
-    ownKeys: target => {
-      const ownKeys = Reflect.ownKeys(target)
-      ownKeys.splice(ownKeys.indexOf('transaction'), 1)
-      ownKeys.push('commit')
-      ownKeys.push('rollback')
-      return ownKeys
-    },
-
-    has: (target, prop) => {
-      if (prop === 'transaction') {
-        return false
-      }
-      if (prop === 'commit' || prop === 'rollback') {
-        return true
-      }
-      return prop in target
-    }
-  })
-}
-
 module.exports = class PgDir {
   // !!! reads dirs synchronously
   // so, this will block, while doing so
   // this is intentional, since `constructor`
   // does not yet support await
-  constructor(dirPath) {
+  constructor(dirPath, withinTransaction = false) {
+    this[privateDirPath] = dirPath
+    this[privateSession] = { client: null, keepAlive: withinTransaction }
+
     const directoryDirents = fs.readdirSync(dirPath, { withFileTypes: true })
+
+    if (withinTransaction) {
+      this.begin = () => {
+        debugQuery(chalk.blue('begin'))
+        return handleQuery('begin', null, this[privateSession])
+      }
+
+      this.commit = () => {
+        this[privateSession].keepAlive = false
+        debugQuery(chalk.blue('commit'))
+        return handleQuery('commit', null, this[privateSession])
+      }
+
+      this.savepoint = name => {
+        const command = `savepoint ${name}`
+        debugQuery(chalk.blue(command))
+        return handleQuery(command, null, this[privateSession])
+      }
+
+      this.rollback = name => {
+        if (!name) {
+          this[privateSession].keepAlive = false
+        }
+        const command = name ? `rollback to ${name}` : 'rollback'
+        debugQuery(chalk.blue(command))
+        return handleQuery(command, null, this[privateSession])
+      }
+    }
 
     for (let dirent of directoryDirents) {
       if (!dirent.isFile()) {
@@ -216,48 +172,40 @@ module.exports = class PgDir {
       this[nameKey] = queryPassthrough({
         dirPath,
         filename: dirent.name,
-        instance: this,
-        getSession: () => this[transactionSession]
+        session: this[privateSession]
       })
-
-      this[withinTransaction] = false
-      this[transactionSession] = null
     }
   }
 
   get transaction() {
-    return proxiedTransactionInstance(this)
+    return new PgDir(this[privateDirPath], true)
   }
 }
 
-// if `connection` is passed, then .handleQuery assumes
+// if `client` is passed, then .handleQuery assumes
 // that .release() will be handled manually
 function handleQuery(queryString, queryArgs, session) {
-  session = session || {}
-  let { connection, keepAlive = false } = session
-
   return new Promise(async (resolve, reject) => {
     let result, err
 
-    if (!connection) {
+    if (!session.client) {
       try {
-        connection = await pool.connect()
+        session.client = await pool.connect()
       } catch(connErr) {
         return reject(connErr)
       }
     }
 
-    session.connection = connection
-
     debugExecuted(queryString, queryArgs)
     
     try {
-      result = await connection.query(queryString, queryArgs)
+      result = await session.client.query(queryString, queryArgs)
     } catch(tryErr) {
       err = tryErr
     } finally {
-      if (!keepAlive) {
-        connection.release()
+      if (!session.keepAlive && session.client) {
+        session.client.release()
+        session.client = null
       }
     }
 
