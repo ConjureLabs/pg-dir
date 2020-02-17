@@ -160,6 +160,18 @@ try {
 }
 ```
 
+you can also create savepoints, and rollback to these savepoints
+
+note that if you rollback to a savepoint the sql pool connection will not be released
+
+```js
+await transaction.savepoint('some_point')
+
+// do something else
+
+await transaction.rollback('some_point')
+```
+
 ### console logging
 
 logging is built in - this library uses the [debug](https://www.npmjs.com/package/debug) module
