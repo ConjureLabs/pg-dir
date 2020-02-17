@@ -1,6 +1,6 @@
 {
   "name": "@conjurelabs/pg-dir",
-  "version": "2.2.2-rc1",
+  "version": "2.2.2-rc2",
   "description": "query postgres using directories of templatized sql flat files",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@conjurelabs/dot-template": "2.2.0",
-    "@conjurelabs/pg-dot-template": "2.0.3",
+    "@conjurelabs/pg-dot-template": "2.0.4",
     "chalk": "3.0.0",
     "debug": "4.1.1"
   },
