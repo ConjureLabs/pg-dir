@@ -18,6 +18,20 @@ see [the node postgres docs](https://node-postgres.com/) on setting up your data
 
 once `pg` is connected, then store you `.sql` files in a directory and initialize `PgDir` to start querying.
 
+### pg pool config
+
+you can set [the config](https://node-postgres.com/api/pool) which will be used for all pool connections
+
+```js
+const { usingPoolConfig } = require('@conjurelabs/pg-dir')
+
+usingPoolConfig({
+  idleTimeoutMillis: 10000
+})
+```
+
+this should be set before any use of sql
+
 ### directory setup
 
 _./sql/accounts/get-account.sql_
