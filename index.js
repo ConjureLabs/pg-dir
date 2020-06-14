@@ -191,7 +191,7 @@ module.exports = class PgDir {
   }
 }
 
-module.exports.applyPoolConfig = config => {
+module.exports.usingPoolConfig = config => {
   poolConfig = config
   existingPool = null
 }
