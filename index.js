@@ -6,9 +6,18 @@ const chalk = require('chalk')
 const debugQuery = require('debug')('pg-dir:query')
 const debugExecuted = require('debug')('pg-dir:executed')
 
-const pool = new Pool()
+let poolConfig
 const privateDirPath = Symbol('privateDirPath')
 const privateSession = Symbol('privateSession')
+
+let existingPool
+function getPool() {
+  if (existingPool) {
+    return existingPool
+  }
+  existingPool = new Pool(poolConfig)
+  return existingPool
+}
 
 function snakeToCamelCase(name, expr = /_+[a-z]/g) {
   // expecting lower_snake_cased names form postgres
@@ -182,10 +191,16 @@ module.exports = class PgDir {
   }
 }
 
+module.exports.applyPoolConfig = config => {
+  poolConfig = config
+  existingPool = null
+}
+
 // if `client` is passed, then .handleQuery assumes
 // that .release() will be handled manually
 function handleQuery(queryString, queryArgs, session) {
   return new Promise(async (resolve, reject) => {
+    const pool = getPool()
     let result, err
 
     if (!session.client) {
