@@ -31,7 +31,7 @@
     "@conjurelabs/dot-template": "2.3.3",
     "@conjurelabs/pg-dot-template": "2.0.9",
     "chalk": "3.0.0",
-    "debug": "4.1.1"
+    "debug": "4.3.1"
   },
   "peerDependencies": {
     "pg": ">= 7.0.0"
